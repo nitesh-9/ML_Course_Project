@@ -1,0 +1,142 @@
+---
+title: "ML Course Project"
+author: "Nitesh Champaneri"
+date: "02/06/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+# Fitness Prediction
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+## Submission
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+
+
+## 0.0 Data Processing 
+
+For the purposes of reproducibility, the seed will set to 999. 
+
+
+```{r, include=TRUE, warning=FALSE}
+set.seed = 999
+
+#Packages
+library(ggplot2)
+library(caret)
+library(dplyr)
+library(lattice)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(Rcpp)
+library(randomForest)
+
+
+#Load in data
+
+url_train <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+url_test <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+train_data <- read.csv(url_train)
+test_data <- read.csv(url_test)
+```
+# Exploratory Analysis
+
+```{r, include=TRUE, results='hide'}
+head(train_data)
+
+
+group_class <- train_data %>%
+    group_by(classe) %>% 
+    summarise(counts = n())
+
+barplot <- ggplot(group_class, aes(x = classe, y = counts)) +
+    geom_bar(stat = "identity", fill = "blue") + 
+    labs(title = "Classe Counts",
+         x = "Classe",
+         y = "Counts")
+barplot
+
+
+```
+
+# Cleaning the data
+
+Here we remove columns where the variance is close to zero
+
+```{r}
+
+NZV <- nearZeroVar(train_data, saveMetrics=TRUE)
+
+NZV_2 <- NZV %>% filter(nzv == TRUE)
+
+#Remove columns where NZV = True
+
+NZV_col_remove <- names(train_data) %in% c("new_window", "kurtosis_roll_belt", "kurtosis_picth_belt",
+                                           "kurtosis_yaw_belt", "skewness_roll_belt", "skewness_roll_belt.1", "skewness_yaw_belt",
+                                           "max_yaw_belt", "min_yaw_belt", "amplitude_yaw_belt", "avg_roll_arm", "stddev_roll_arm",
+                                           "var_roll_arm", "avg_pitch_arm", "stddev_pitch_arm", "var_pitch_arm", "avg_yaw_arm",
+                                           "stddev_yaw_arm", "var_yaw_arm", "kurtosis_roll_arm", "kurtosis_picth_arm",
+                                           "kurtosis_yaw_arm", "skewness_roll_arm", "skewness_pitch_arm", "skewness_yaw_arm",
+                                           "max_roll_arm", "min_roll_arm", "min_pitch_arm", "amplitude_roll_arm", "amplitude_pitch_arm",
+                                           "kurtosis_roll_dumbbell", "kurtosis_picth_dumbbell", "kurtosis_yaw_dumbbell", "skewness_roll_dumbbell",
+                                           "skewness_pitch_dumbbell", "skewness_yaw_dumbbell", "max_yaw_dumbbell", "min_yaw_dumbbell",
+                                           "amplitude_yaw_dumbbell", "kurtosis_roll_forearm", "kurtosis_picth_forearm", "kurtosis_yaw_forearm",
+                                           "skewness_roll_forearm", "skewness_pitch_forearm", "skewness_yaw_forearm", "max_roll_forearm",
+                                           "max_yaw_forearm", "min_roll_forearm", "min_yaw_forearm", "amplitude_roll_forearm",
+                                           "amplitude_yaw_forearm", "avg_roll_forearm", "stddev_roll_forearm", "var_roll_forearm",
+                                           "avg_pitch_forearm", "stddev_pitch_forearm", "var_pitch_forearm", "avg_yaw_forearm",
+                                           "stddev_yaw_forearm", "var_yaw_forearm")
+
+train_data <- train_data[!NZV_col_remove]
+test_data <- test_data[!NZV_col_remove]
+
+```
+
+# partition the data with 70:30 split
+
+```{r}
+inTrain <- caret::createDataPartition(train_data$classe,p=0.70,list=FALSE);
+training <- train_data[inTrain, ]
+testing <- train_data[-inTrain, ]
+
+dim(training)
+dim(testing)
+
+```
+
+
+# Train the model
+
+```{r}
+modFitA1 <- rpart(classe ~ ., data=training, method="class")
+fancyRpartPlot(modFitA1)                   
+
+```
+```{r}
+predictionsA1 <- predict(modFitA1, data = testing, type = "class")
+
+
+```
